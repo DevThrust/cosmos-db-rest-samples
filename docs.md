@@ -22,9 +22,17 @@ The hash signature for the master key token can be constructed from the followin
 1. The ResourceLink portion of the string is the identity property of the resource that the request is directed at.
  The ResourceLink value is dependent on the operation you are trying to execute. 
  Each operation will have its own corresponding ResourceLink following this convention: 
-    - If the operation is performed against a specific resource then the value is the link to that resource (i.e. Get Database is `dbs/{databaseId}`, Get Document is `dbs/{databaseId}/colls/{containerId}/docs/{docId}`). 
-    - If the operation is performed against a set of resources (List, Create, Query) then the value is the link of the parent resrouce(i.e. Create Document is `dbs/{databaseId}/colls/{containerId}`, Create a Stored Procedure is `dbs/{databaseId}/colls/{containerId}`, Create a Container is `dbs/{databaseId}` and Create Database is an empty string since Databases do not have a parent resource) 
-     
+    - If the operation is performed against a specific resource then the value is the link to that resource. 
+    Examples:
+        - For Get Database use: `dbs/{databaseId}`
+        - For Get Document use: `dbs/{databaseId}/colls/{containerId}/docs/{docId}`
+        
+    - If the operation is performed against a set of resources (List, Create, Query) then the value is the link of the parent resrouce. Examples: 
+        - For Create Document use: `dbs/{databaseId}/colls/{containerId}`
+        - For Create Stored Procedure use: `dbs/{databaseId}/colls/{containerId}`
+        - For Create a Container use: `dbs/{databaseId}`
+        - For Create Database use: "" -> an empty string since Databases do not have a parent resource
+             
      **Note:** The resource names that are being referenced as part of the ResourceLink value are case sensitive and must match the casing of how they were declared in the database. The other components must be lowercase.
 
 1. The Date portion of the string is the UTC date and time the message was sent (in "HTTP-date" format as defined by [RFC 7231 Date/Time Formats](http://tools.ietf.org/html/rfc7231#section-7.1.1.1)), for example, "Tue, 01 Nov 1994 08:12:31 GMT". 
