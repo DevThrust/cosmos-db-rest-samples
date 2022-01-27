@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Dynamic;
+using System.Net;
 using System.Text.Json;
 
 var cosmosKey = Environment.GetEnvironmentVariable("Cosmos:Key");
@@ -12,24 +13,37 @@ if (string.IsNullOrEmpty(cosmosKey) || string.IsNullOrEmpty(accountName) || stri
     return;
 }
 
-Console.WriteLine(accountName);
-
 var baseUrl = $"https://{accountName}.documents.azure.com";
 var httpClient = new HttpClient();
 
+//Document operations
 
-await CreateItem(new ItemDto("id1", "pk1", "value1"));
-await CreateItem(new ItemDto("id2", "pk1", "value1"));
+var item1 = new ItemDto("id1", "pk1", "value1");
+var item11 = new ItemDto("id11", "pk1", "value-11");
+var item2 = new ItemDto("id2", "pk1", "value2");
+var item3 = new ItemDto("id3", "pk2", "value3");
 
-await GetItem(id: "id1", partitionKey: "pk1");
-await ListItems(partitionKey:"pk1");
+await CreateDocument(item1);
+await CreateDocument(item2);
+await CreateDocument(item3);
 
-await DeleteItem(id: "id1", partitionKey: "pk1");
-await DeleteItem(id: "id2", partitionKey: "pk1");
+await PatchDocument(id: item1.id, partitionKey: item1.pk);
+await ReplaceDocument(id: item1.id, newItem: item11); //cannot change partitionKey in a replace operation, but can update id
 
 
+await ListDocuments(partitionKey: item1.pk);
+await GetDocument(id: item2.id, partitionKey: item2.pk);
 
-async Task CreateItem(ItemDto item)
+await QueryDocuments(partitionKey: item1.pk);
+await QueryDocumentsCrossPartition();
+
+await DeleteDocument(id: item1.id, partitionKey: item1.pk);
+await DeleteDocument(id: item11.id, partitionKey: item11.pk);
+await DeleteDocument(id: item2.id, partitionKey: item2.pk);
+await DeleteDocument(id: item3.id, partitionKey: item3.pk);
+
+
+async Task CreateDocument(ItemDto item)
 {
     var method = HttpMethod.Post;
 
@@ -52,11 +66,117 @@ async Task CreateItem(ItemDto item)
     var httpRequest = new HttpRequestMessage { Method = method, Content = requestContent, RequestUri = requestUri };
 
     var httpResponse = await httpClient.SendAsync(httpRequest);
-
-    Console.WriteLine($"Upsert: {httpResponse.IsSuccessStatusCode}");
+    await ReportOutput("Create Document", httpResponse);
 }
 
-async Task DeleteItem(string id, string partitionKey)
+async Task ListDocuments(string partitionKey)
+{
+    var method = HttpMethod.Get;
+    var resourceType = ResourceType.docs;
+    var resourceLink = $"dbs/{databaseName}/colls/{containerName}";
+    var requestDateString = DateTime.UtcNow.ToString("r");
+    var auth = GenerateMasterKeyAuthorizationSignature(method, resourceType, resourceLink, requestDateString, cosmosKey);
+
+    httpClient.DefaultRequestHeaders.Clear();
+    httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+    httpClient.DefaultRequestHeaders.Add("authorization", auth);
+    httpClient.DefaultRequestHeaders.Add("x-ms-date", requestDateString);
+    httpClient.DefaultRequestHeaders.Add("x-ms-version", "2018-12-31");
+    httpClient.DefaultRequestHeaders.Add("x-ms-documentdb-partitionkey", $"[\"{partitionKey}\"]");
+
+    var requestUri = new Uri($"{baseUrl}/{resourceLink}/docs");
+    var httpRequest = new HttpRequestMessage { Method = method, RequestUri = requestUri };
+
+    var httpResponse = await httpClient.SendAsync(httpRequest);
+    await ReportOutput($"List Documents for partitionKey {partitionKey}", httpResponse);
+}
+
+async Task GetDocument(string id, string partitionKey)
+{
+    var method = HttpMethod.Get;
+    var resourceType = ResourceType.docs;
+    var resourceLink = $"dbs/{databaseName}/colls/{containerName}/docs/{id}";
+    var requestDateString = DateTime.UtcNow.ToString("r");
+    var auth = GenerateMasterKeyAuthorizationSignature(method, resourceType, resourceLink, requestDateString, cosmosKey);
+
+    httpClient.DefaultRequestHeaders.Clear();
+    httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+    httpClient.DefaultRequestHeaders.Add("authorization", auth);
+    httpClient.DefaultRequestHeaders.Add("x-ms-date", requestDateString);
+    httpClient.DefaultRequestHeaders.Add("x-ms-version", "2018-12-31");
+    httpClient.DefaultRequestHeaders.Add("x-ms-documentdb-partitionkey", $"[\"{partitionKey}\"]");
+
+    var requestUri = new Uri($"{baseUrl}/{resourceLink}");
+    var httpRequest = new HttpRequestMessage { Method = method, RequestUri = requestUri };
+
+    var httpResponse = await httpClient.SendAsync(httpRequest);
+    await ReportOutput($"Get Document by id: '{id}'", httpResponse);
+}
+
+async Task ReplaceDocument(string id, ItemDto newItem)
+{
+    var method = HttpMethod.Put;
+
+    var resourceType = ResourceType.docs;
+    var resourceLink = $"dbs/{databaseName}/colls/{containerName}/docs/{id}";
+    var requestDateString = DateTime.UtcNow.ToString("r");
+    var auth = GenerateMasterKeyAuthorizationSignature(method, resourceType, resourceLink, requestDateString, cosmosKey);
+
+    httpClient.DefaultRequestHeaders.Clear();
+    httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+    httpClient.DefaultRequestHeaders.Add("authorization", auth);
+    httpClient.DefaultRequestHeaders.Add("x-ms-date", requestDateString);
+    httpClient.DefaultRequestHeaders.Add("x-ms-version", "2018-12-31");
+    httpClient.DefaultRequestHeaders.Add("x-ms-documentdb-partitionkey", $"[\"{newItem.pk}\"]");
+
+    var requestUri = new Uri($"{baseUrl}/{resourceLink}");
+    var requestContent = new StringContent(JsonSerializer.Serialize(newItem), System.Text.Encoding.UTF8, "application/json");
+
+    var httpRequest = new HttpRequestMessage { Method = method, Content = requestContent, RequestUri = requestUri };
+
+    var httpResponse = await httpClient.SendAsync(httpRequest);
+    await ReportOutput($"Replace Document with id '{id}'", httpResponse);
+
+}
+
+async Task PatchDocument(string id, string partitionKey)
+{
+    var method = HttpMethod.Patch;
+
+    var resourceType = ResourceType.docs;
+    var resourceLink = $"dbs/{databaseName}/colls/{containerName}/docs/{id}";
+    var requestDateString = DateTime.UtcNow.ToString("r");
+    var auth = GenerateMasterKeyAuthorizationSignature(method, resourceType, resourceLink, requestDateString, cosmosKey);
+
+    httpClient.DefaultRequestHeaders.Clear();
+    httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+    httpClient.DefaultRequestHeaders.Add("authorization", auth);
+    httpClient.DefaultRequestHeaders.Add("x-ms-date", requestDateString);
+    httpClient.DefaultRequestHeaders.Add("x-ms-version", "2018-12-31");
+    httpClient.DefaultRequestHeaders.Add("x-ms-documentdb-partitionkey", $"[\"{partitionKey}\"]");
+
+    var requestUri = new Uri($"{baseUrl}/{resourceLink}");
+    var requestBody = @"
+{
+  ""operations"": [
+    {
+      ""op"": ""set"",
+      ""path"": ""/someProperty"",
+      ""value"": ""value-patched""
+    }
+  ]
+}  ";
+
+    var requestContent = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
+
+    var httpRequest = new HttpRequestMessage { Method = method, Content = requestContent, RequestUri = requestUri };
+
+    var httpResponse = await httpClient.SendAsync(httpRequest);
+    await ReportOutput($"Patch Document with id '{id}'", httpResponse);
+}
+
+
+async Task DeleteDocument(string id, string partitionKey)
 {
     var method = HttpMethod.Delete;
     var resourceType = ResourceType.docs;
@@ -76,13 +196,13 @@ async Task DeleteItem(string id, string partitionKey)
 
     var httpResponse = await httpClient.SendAsync(httpRequest);
 
-    Console.WriteLine($"Delete: {httpResponse.IsSuccessStatusCode}");
+    Console.WriteLine($"Deleted item with id '{id}': {httpResponse.IsSuccessStatusCode}");
 }
 
 
-async Task ListItems(string partitionKey)
+async Task QueryDocuments(string partitionKey)
 {
-    var method = HttpMethod.Get;
+    var method = HttpMethod.Post;
     var resourceType = ResourceType.docs;
     var resourceLink = $"dbs/{databaseName}/colls/{containerName}";
     var requestDateString = DateTime.UtcNow.ToString("r");
@@ -93,21 +213,34 @@ async Task ListItems(string partitionKey)
     httpClient.DefaultRequestHeaders.Add("authorization", auth);
     httpClient.DefaultRequestHeaders.Add("x-ms-date", requestDateString);
     httpClient.DefaultRequestHeaders.Add("x-ms-version", "2018-12-31");
-    httpClient.DefaultRequestHeaders.Add("x-ms-documentdb-partitionkey", $"[\"{partitionKey}\"]");
+    httpClient.DefaultRequestHeaders.Add("x-ms-documentdb-isquery", "True");
 
     var requestUri = new Uri($"{baseUrl}/{resourceLink}/docs");
-    var httpRequest = new HttpRequestMessage { Method = method, RequestUri = requestUri };
+    var requestBody = @$"
+{{  
+  ""query"": ""SELECT * FROM c WHERE c.pk = @pk"",  
+  ""parameters"": [
+    {{  
+      ""name"": ""@pk"",
+      ""value"": ""{partitionKey}""  
+    }}
+  ]  
+}}";
+    var requestContent = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/query+json");
+    //NOTE -> this is important. CosmosDB expects a specific Content-Type with no CharSet on a query request.
+    requestContent.Headers.ContentType.CharSet = ""; 
+    var httpRequest = new HttpRequestMessage { Method = method, Content=requestContent, RequestUri = requestUri };
 
     var httpResponse = await httpClient.SendAsync(httpRequest);
 
-    Console.WriteLine($"Query: {httpResponse.IsSuccessStatusCode}");
+    await ReportOutput("Query: ", httpResponse);
 }
 
-async Task GetItem(string id, string partitionKey)
+async Task QueryDocumentsCrossPartition()
 {
-    var method = HttpMethod.Get;
+    var method = HttpMethod.Post;
     var resourceType = ResourceType.docs;
-    var resourceLink = $"dbs/{databaseName}/colls/{containerName}/docs/{id}";
+    var resourceLink = $"dbs/{databaseName}/colls/{containerName}";
     var requestDateString = DateTime.UtcNow.ToString("r");
     var auth = GenerateMasterKeyAuthorizationSignature(method, resourceType, resourceLink, requestDateString, cosmosKey);
 
@@ -116,15 +249,28 @@ async Task GetItem(string id, string partitionKey)
     httpClient.DefaultRequestHeaders.Add("authorization", auth);
     httpClient.DefaultRequestHeaders.Add("x-ms-date", requestDateString);
     httpClient.DefaultRequestHeaders.Add("x-ms-version", "2018-12-31");
-    httpClient.DefaultRequestHeaders.Add("x-ms-documentdb-partitionkey", $"[\"{partitionKey}\"]");
+    httpClient.DefaultRequestHeaders.Add("x-ms-max-item-count", "2");
+    httpClient.DefaultRequestHeaders.Add("x-ms-documentdb-query-enablecrosspartition", "True");
+    httpClient.DefaultRequestHeaders.Add("x-ms-documentdb-isquery", "True");
 
-    var requestUri = new Uri($"{baseUrl}/{resourceLink}");
-    var httpRequest = new HttpRequestMessage { Method = method, RequestUri = requestUri };
+    var requestUri = new Uri($"{baseUrl}/{resourceLink}/docs");
+    var requestBody = @$"
+{{  
+  ""query"": ""SELECT * FROM c"",  
+  ""parameters"": []  
+}}";
+
+    var requestContent = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/query+json");
+    //NOTE -> this is important. CosmosDB expects a specific Content-Type with no CharSet on a query request.
+    requestContent.Headers.ContentType.CharSet = "";
+    var httpRequest = new HttpRequestMessage { Method = method, Content = requestContent, RequestUri = requestUri };
 
     var httpResponse = await httpClient.SendAsync(httpRequest);
+    //var continuation = httpResponse.Headers.GetValues("x-ms-continuation");
 
-    Console.WriteLine($"Get: {httpResponse.IsSuccessStatusCode}");
+    await ReportOutput("Query: ", httpResponse);
 }
+
 
 
 
@@ -142,7 +288,20 @@ string GenerateMasterKeyAuthorizationSignature(HttpMethod verb, ResourceType res
     return authSet;
 }
 
-
+async Task ReportOutput(string methodName,HttpResponseMessage httpResponse)
+{
+    var responseContent = await httpResponse.Content.ReadAsStringAsync();
+    if (httpResponse.IsSuccessStatusCode)
+    {
+        Console.WriteLine($"{methodName}: SUCCESS\n    {responseContent}\n\n");
+    }
+    else
+    {
+        Console.ForegroundColor = ConsoleColor.DarkRed;
+        Console.WriteLine($"{methodName}: FAILED -> {(int)httpResponse.StatusCode}: {httpResponse.ReasonPhrase}.\n    {responseContent}\n\n");
+        Console.ForegroundColor = ConsoleColor.White;
+    }
+}
 
 record ItemDto (string id, string pk, string someProperty);
 

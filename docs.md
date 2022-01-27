@@ -1,3 +1,4 @@
+
 ## Constructing the hashed token signature for a master token
 
 The hash signature for the master key token can be constructed from the following parameters: **Verb**, **ResourceType**, **ResourceLink**, and **Date**.
@@ -19,8 +20,8 @@ The hash signature for the master key token can be constructed from the followin
  Each operation will have its own corresponding ResourceLink as follows:
      - Database level operations: `"dbs/{databaseName}"`
      - Container level operations: `"dbs/{databaseName/colls/{containerName}"`
-     - Item operations that do not target a specific item (Create, Update, Query): `"dbs/{databaseName/colls/{containerName}"`
-     - Item operations that target a specific item (Get, Delete): `"dbs/{databaseName/colls/{containerName}/docs/{docId}"`
+     - Item operations that do not target a specific item (Create, Query): `"dbs/{databaseName/colls/{containerName}"`
+     - Item operations that target a specific item (Get, Update, Delete): `"dbs/{databaseName/colls/{containerName}/docs/{docId}"`
      
      **Note:** The resource names that are being referenced as part of the ResourceLink value are case sensitive and must match the casing of how they were declared in the database. The other components must be lowercase.
 
@@ -37,3 +38,14 @@ To compute the signature we use the SHA256 based Hash-based Message Authenticati
 The payload for the hashing function is based on the 4 components presented above using the following format: `"{verb}\n{resourceType}\n{resourceLink}\n{date}\n\n"` (note the extra new line at the end of the payload).
 
 The Base64 encoded result of the function will be used as the signature when constructing the Authorization header for the call.
+
+
+
+## Other updates to docs
+
+#### Replace a document
+    - in the Request section there is a mention of "{doc-name}" and "document name" it should be {doc-id}
+
+#### Query Documents 
+    - Update docs to mention that cosmos expects a specific Content-Type in the POST request for a query, that does not include a value for CharSet (which is added by default by HttpClient in C#)
+
