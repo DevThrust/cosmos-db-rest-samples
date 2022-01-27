@@ -8,20 +8,22 @@ The hash signature for the master key token can be constructed from the followin
     **Note:**: The values must be lowercase.
 
 1. The ResourceType portion of the string identifies the type of resource that the request is for. Possible values are: 
-    Each operation will have its own corresponding ResourceType as follows:
-    - Database level operations: `dbs`
-    - Container level operations: `colls`
+    - Database operations: `dbs`
+    - Container operations: `colls`
+    - Stored Procedures: `sprocs`
+    - User Defined Functions: `udfs`
+    - Triggers: `triggers`
+    - Users: `users`
+    - Permissions: `permissions`
     - Item level operations: `docs`
     
     **Note:** The values are case sensitive and must be lowercase.
    
 1. The ResourceLink portion of the string is the identity property of the resource that the request is directed at.
  The ResourceLink value is dependent on the operation you are trying to execute. 
- Each operation will have its own corresponding ResourceLink as follows:
-     - Database level operations: `"dbs/{databaseName}"`
-     - Container level operations: `"dbs/{databaseName/colls/{containerName}"`
-     - Item operations that do not target a specific item (Create, Query): `"dbs/{databaseName/colls/{containerName}"`
-     - Item operations that target a specific item (Get, Update, Delete): `"dbs/{databaseName/colls/{containerName}/docs/{docId}"`
+ Each operation will have its own corresponding ResourceLink following this convention: 
+    - If the operation is performed against a specific resource then the value is the link to that resource (i.e. Get Database is `dbs/{databaseId}`, Get Document is `dbs/{databaseId}/colls/{containerId}/docs/{docId}`). 
+    - If the operation is performed against a set of resources (List, Create, Query) then the value is the link of the parent resrouce(i.e. Create Document is `dbs/{databaseId}/colls/{containerId}`, Create a Stored Procedure is `dbs/{databaseId}/colls/{containerId}`, Create a Container is `dbs/{databaseId}` and Create Database is an empty string since Databases do not have a parent resource) 
      
      **Note:** The resource names that are being referenced as part of the ResourceLink value are case sensitive and must match the casing of how they were declared in the database. The other components must be lowercase.
 
