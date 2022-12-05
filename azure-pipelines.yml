@@ -1,18 +1,24 @@
 trigger:
 - main
 
+pool:
+  vmImage: ubuntu-latest
+
 stages:
 - stage: Build
   displayName: Build Stage
-  pool:
-      vmImage: ubuntu-latest
+
   jobs:
   - job: Build
     displayName: Build Job
 
     steps:
       - script: dotnet build
-    
+
+
+- stage: Publish
+  displayName: Publish Stage
+  jobs:
   - job: Publish
     displayName: Publish Job
 
