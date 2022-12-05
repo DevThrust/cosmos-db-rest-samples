@@ -4,29 +4,20 @@ trigger:
 stages:
 - stage: Build
   displayName: Build Stage
-  
+  pool:
+      vmImage: ubuntu-latest
   jobs:
   - job: Build
     displayName: Build Job
-  
-    pool:
-      vmImage: ubuntu-latest
-  
+
     steps:
       - script: dotnet build
-
-- stage: Publish
-  displayName: Publish Stage
-  
-  jobs:
+    
   - job: Publish
     displayName: Publish Job
-  
-    pool:
-      vmImage: ubuntu-latest
-  
+
     steps:
-      - script: dotnet publish --no-build -o ./package
+      - script: dotnet publish -o ./package
 
       - task: PublishBuildArtifacts@1
         inputs:
